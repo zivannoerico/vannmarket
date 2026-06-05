@@ -19,15 +19,22 @@ function isAdminLoggedIn(): bool {
 }
 
 function requireAdmin(): void {
-    if (!isAdminLoggedIn()) {
-        // Auto-login sebagai admin tanpa password
-        $_SESSION['admin_id'] = 1;
-        $_SESSION['admin_user'] = 'admin';
-    }
+    if (!isAdminLoggedIn()) redirect('/vannmarket/admin/login.php');
+}
+
+function isUserLoggedIn(): bool {
+    return isset($_SESSION['user_id']);
+}
+
+function getLoggedUser(): ?array {
+    if (!isset($_SESSION['user_id'])) return null;
+    return [
+        'user_id'  => $_SESSION['user_id'],
+        'username' => $_SESSION['user_name'] ?? '',
+    ];
 }
 
 function getBaseUrl(): string {
     $protocol = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
-    $host = $_SERVER['HTTP_HOST'];
-    return $protocol . '://' . $host . '/vannmarket';
+    return $protocol . '://' . $_SERVER['HTTP_HOST'] . '/vannmarket';
 }

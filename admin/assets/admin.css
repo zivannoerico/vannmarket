@@ -162,4 +162,24 @@ tbody tr:hover td { background:#1e1e1e; }
   .sidebar { transform:translateX(-100%); }
   .main-wrap { margin-left:0; }
   .stats-grid { grid-template-columns:repeat(2,1fr); }
+  /* ===== NOTIF BADGE SIDEBAR ===== */
+.notif-badge {
+  margin-left: auto;
+  background: #e60000;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+  min-width: 20px;
+  height: 20px;
+  border-radius: 10px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 5px;
+  animation: pulse-badge 2s infinite;
+}
+@keyframes pulse-badge {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(230,0,0,.4); }
+  50% { box-shadow: 0 0 0 5px rgba(230,0,0,0); }
+}
 }

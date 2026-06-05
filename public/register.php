@@ -1,10 +1,11 @@
 <?php
-// public/register.php
 session_start();
 require_once __DIR__ . '/../config/db.php';
 require_once __DIR__ . '/../config/helpers.php';
 
-$error = ''; $success = '';
+if (isUserLoggedIn()) redirect('/vannmarket/');
+
+$error = '';
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $username = trim($_POST['username'] ?? '');
     $email    = trim($_POST['email'] ?? '');
@@ -19,7 +20,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     } elseif (strlen($password) < 6) {
         $error = 'Password minimal 6 karakter.';
     } else {
-        // Cek duplikat username
         $chk = $conn->prepare("SELECT user_id FROM users WHERE username=?");
         $chk->bind_param("s", $username);
         $chk->execute();
@@ -30,7 +30,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $stmt = $conn->prepare("INSERT INTO users (username,email,phone_number,password,status,created_at) VALUES (?,?,?,?,'active',NOW())");
             $stmt->bind_param("ssss", $username, $email, $phone, $hash);
             if ($stmt->execute()) {
-                $success = 'Akun berhasil dibuat! Silakan masuk.';
+                // Auto login setelah daftar
+                $new_id = $conn->insert_id;
+                $_SESSION['user_id']    = $new_id;
+                $_SESSION['user_name']  = $username;
+                $_SESSION['user_email'] = $email;
+                redirect('/vannmarket/');
             } else {
                 $error = 'Gagal mendaftar: ' . $conn->error;
             }
@@ -48,19 +53,17 @@ $pageTitle = 'Daftar';
 
 <div style="min-height:70vh;display:flex;align-items:center;justify-content:center;padding:40px 20px;">
   <div style="background:#1e1e1e;border-radius:16px;padding:40px;width:100%;max-width:440px;border:1px solid #2a2a2a;">
-    <h2 style="margin-bottom:24px;text-align:center;">Buat Akun Baru</h2>
+    <h2 style="margin-bottom:8px;text-align:center;">Buat Akun Baru</h2>
+    <p style="text-align:center;color:#888;font-size:13px;margin-bottom:24px;">Daftar gratis dan mulai top up!</p>
 
-    <?php if ($error): ?><div class="alert alert-error"><?= esc($error) ?></div><?php endif; ?>
-    <?php if ($success): ?>
-    <div class="alert alert-success"><?= esc($success) ?>
-      <a href="/vannmarket/public/login.php" style="color:#4caf88;font-weight:600;"> Masuk sekarang →</a>
-    </div>
+    <?php if ($error): ?>
+    <div class="alert alert-error"><?= esc($error) ?></div>
     <?php endif; ?>
 
     <form method="POST">
       <div class="field-group">
         <label>Username *</label>
-        <input type="text" name="username" placeholder="Pilih username" required>
+        <input type="text" name="username" placeholder="Pilih username unik" required autofocus>
       </div>
       <div class="field-group">
         <label>Email</label>
@@ -78,7 +81,7 @@ $pageTitle = 'Daftar';
         <label>Konfirmasi Password *</label>
         <input type="password" name="confirm_password" placeholder="Ulangi password" required>
       </div>
-      <button type="submit" class="btn-order" style="margin-top:16px;">Daftar Sekarang</button>
+      <button type="submit" class="btn-order" style="margin-top:16px;width:100%;">Daftar Sekarang</button>
     </form>
 
     <p style="text-align:center;margin-top:20px;font-size:14px;color:#888;">
