@@ -67,6 +67,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         <input type="password" name="password" placeholder="Masukkan password" required>
       </div>
       <button type="submit" class="btn-login">Masuk ke Dashboard</button>
+      <div style="margin-top:20px;background:#1a1a1a;border:1px dashed #e60000;border-radius:8px;padding:14px 16px;text-align:left;">
+  <p style="font-size:12px;color:#888;margin-bottom:8px;">📋 Info Login (untuk pengecekan guru):</p>
+  <p style="margin:4px 0;font-size:14px;color:#ccc;">👤 Username : <strong style="color:#fff;">admin</strong></p>
+ <p style="margin:4px 0;font-size:14px;color:#ccc;">🔑 Password : <strong style="color:#e60000;">password</strong></p>
     </form>
   </div>
 </body>

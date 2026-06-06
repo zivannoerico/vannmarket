@@ -28,6 +28,21 @@ while ($p = $packages_result->fetch_assoc()) {
 // Ambil metode pembayaran
 $payments = $conn->query("SELECT * FROM payment_methods WHERE is_active=1 ORDER BY method_type, method_name");
 
+// Ambil voucher aktif
+$today_date = date('Y-m-d');
+$voucher_stmt = $conn->prepare("
+    SELECT * FROM vouchers
+    WHERE is_active = 1
+      AND (game_id = ? OR game_id IS NULL)
+      AND (valid_from IS NULL OR valid_from <= ?)
+      AND (valid_until IS NULL OR valid_until >= ?)
+      AND (max_usage IS NULL OR used_count < max_usage)
+    ORDER BY discount_pct DESC
+");
+$voucher_stmt->bind_param("iss", $game_id, $today_date, $today_date);
+$voucher_stmt->execute();
+$available_vouchers = $voucher_stmt->get_result()->fetch_all(MYSQLI_ASSOC);
+
 $pageTitle = 'Top Up ' . $game['game_name'];
 ?>
 <!DOCTYPE html>
@@ -92,10 +107,6 @@ $pageTitle = 'Top Up ' . $game['game_name'];
             <?php endforeach; ?>
           </div>
           <?php endif; ?>
-
-          <?php if (empty($packages['topup']) && empty($packages['membership'])): ?>
-          <p style="color:#aaa;font-size:14px;">Belum ada paket tersedia untuk game ini.</p>
-          <?php endif; ?>
         </div>
       </div>
 
@@ -121,6 +132,24 @@ $pageTitle = 'Top Up ' . $game['game_name'];
           <h3>Kode Voucher (Opsional)</h3>
         </div>
         <div class="step-body">
+
+          <?php if (!empty($available_vouchers)): ?>
+          <p style="font-size:13px;color:#aaa;margin-bottom:8px;">🎫 Voucher tersedia:</p>
+          <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px;">
+            <?php foreach ($available_vouchers as $av): ?>
+            <button type="button"
+              onclick="pilihVoucher('<?= esc($av['voucher_code']) ?>')"
+              style="background:#1e1e1e;border:1.5px dashed #e60000;border-radius:8px;padding:8px 14px;cursor:pointer;text-align:left;">
+              <span style="font-weight:700;color:#e60000;letter-spacing:1px;"><?= esc($av['voucher_code']) ?></span>
+              <span style="font-size:12px;color:#aaa;margin-left:8px;">Diskon <?= $av['discount_pct'] ?>%</span>
+              <?php if ($av['valid_until']): ?>
+              <span style="font-size:11px;color:#888;display:block;margin-top:2px;">s/d <?= date('d M Y', strtotime($av['valid_until'])) ?></span>
+              <?php endif; ?>
+            </button>
+            <?php endforeach; ?>
+          </div>
+          <?php endif; ?>
+
           <div class="field-group" style="display:flex;gap:10px;">
             <input type="text" id="voucherCode" placeholder="Masukkan kode voucher" style="flex:1;">
             <button id="applyVoucher" style="padding:12px 18px;background:var(--red);color:#fff;border:none;border-radius:8px;font-weight:600;white-space:nowrap;">Pakai</button>
@@ -140,7 +169,6 @@ $pageTitle = 'Top Up ' . $game['game_name'];
           $payment_types = ['e-wallet' => 'E-Wallet', 'bank' => 'Transfer Bank', 'minimarket' => 'Minimarket'];
           $payments_data = [];
           while ($pm = $payments->fetch_assoc()) $payments_data[] = $pm;
-
           foreach ($payment_types as $type => $label):
             $filtered = array_filter($payments_data, fn($p) => $p['method_type'] === $type);
             if (empty($filtered)) continue;
@@ -157,30 +185,10 @@ $pageTitle = 'Top Up ' . $game['game_name'];
         </div>
       </div>
 
-      <!-- DESKRIPSI -->
-      <div class="desc-card">
-        <h3>Deskripsi <?= esc($game['game_name']) ?></h3>
-        <p>
-          Top up <?= esc($game['game_name']) ?> harga paling murah, aman, cepat, dan terpercaya hanya di VANN Market.<br><br>
-          <strong>Cara Top Up:</strong><br>
-          1. Pilih Nominal yang diinginkan<br>
-          2. Masukkan Data Akun (User ID)<br>
-          3. Masukkan Kode Voucher (jika ada)<br>
-          4. Pilih Metode Pembayaran<br>
-          5. Konfirmasi & Klik Pesan Sekarang<br>
-          6. Selesaikan pembayaran<br>
-          7. Diamond otomatis masuk ke akun kamu ✅
-          <?php if ($game['description']): ?>
-          <br><br><?= nl2br(esc($game['description'])) ?>
-          <?php endif; ?>
-        </p>
-      </div>
     </div>
 
     <!-- RIGHT COLUMN -->
     <div class="topup-right">
-
-      <!-- SUMMARY -->
       <div class="summary-card">
         <h3>Ringkasan Pesanan</h3>
         <div id="summaryContent">
@@ -190,21 +198,17 @@ $pageTitle = 'Top Up ' . $game['game_name'];
           🛒 Pesan Sekarang!
         </button>
       </div>
-
-      <!-- RATING -->
       <div class="rating-card">
         <h3>Ulasan & Rating</h3>
         <span class="rating-number">5.0</span>
         <div class="stars">★★★★★</div>
         <p class="rating-count">Berdasarkan ratusan transaksi</p>
       </div>
-
-      <!-- BANTUAN -->
       <div class="help-card">
         <h3>Butuh Bantuan?</h3>
         <p style="font-size:13px;color:#aaa;margin-bottom:12px;">Tim kami siap membantu 24/7</p>
         <button class="btn-contact" onclick="window.open('https://wa.me/62xxxxxxxxxx','_blank')">
-          <i class="fab fa-whatsapp"></i> Hubungi Admin
+          💬 Hubungi Admin
         </button>
       </div>
     </div>
@@ -214,13 +218,11 @@ $pageTitle = 'Top Up ' . $game['game_name'];
 <?php include __DIR__ . '/../components/footer.php'; ?>
 
 <script>
-// ---- State ----
 let selectedPkg = null;
 let selectedPay = null;
 let voucherDiscount = 0;
-let voucherData = null;
 
-// ---- Package selection ----
+// Package selection
 document.querySelectorAll('.pkg-btn').forEach(btn => {
   btn.addEventListener('click', () => {
     document.querySelectorAll('.pkg-btn').forEach(b => b.classList.remove('selected'));
@@ -234,7 +236,7 @@ document.querySelectorAll('.pkg-btn').forEach(btn => {
   });
 });
 
-// ---- Payment selection ----
+// Payment selection
 document.querySelectorAll('.pay-btn').forEach(btn => {
   btn.addEventListener('click', () => {
     document.querySelectorAll('.pay-btn').forEach(b => b.classList.remove('selected'));
@@ -244,7 +246,13 @@ document.querySelectorAll('.pay-btn').forEach(btn => {
   });
 });
 
-// ---- Voucher ----
+// Pilih voucher dari daftar
+function pilihVoucher(code) {
+  document.getElementById('voucherCode').value = code;
+  document.getElementById('applyVoucher').click();
+}
+
+// Apply voucher
 document.getElementById('applyVoucher').addEventListener('click', async () => {
   const code = document.getElementById('voucherCode').value.trim();
   const msg = document.getElementById('voucherMsg');
@@ -255,19 +263,17 @@ document.getElementById('applyVoucher').addEventListener('click', async () => {
   const data = await res.json();
   if (data.valid) {
     voucherDiscount = data.discount_pct;
-    voucherData = data;
     msg.style.color = '#4caf88';
     msg.textContent = `✅ Voucher berhasil! Diskon ${data.discount_pct}%`;
   } else {
     voucherDiscount = 0;
-    voucherData = null;
     msg.style.color = '#e57373';
     msg.textContent = data.message || 'Voucher tidak valid.';
   }
   updateSummary();
 });
 
-// ---- Summary ----
+// Update summary
 function updateSummary() {
   const el = document.getElementById('summaryContent');
   const btn = document.getElementById('orderBtn');
@@ -278,7 +284,6 @@ function updateSummary() {
   }
   const disc = (selectedPkg.price * voucherDiscount / 100);
   const final = selectedPkg.price - disc;
-
   el.innerHTML = `
     <div class="summary-row"><span>Item</span><span>${selectedPkg.name}</span></div>
     <div class="summary-row"><span>Harga</span><span>${formatRp(selectedPkg.price)}</span></div>
@@ -301,10 +306,10 @@ async function submitOrder() {
   const disc = (selectedPkg.price * voucherDiscount / 100);
   const final = selectedPkg.price - disc;
 
-  const confirm = window.confirm(
+  const konfirmasi = window.confirm(
     `Konfirmasi Pesanan:\n\nItem: ${selectedPkg.name}\nUser ID: ${accountId}\nPembayaran: ${selectedPay.name}\nTotal: ${formatRp(final)}\n\nLanjutkan?`
   );
-  if (!confirm) return;
+  if (!konfirmasi) return;
 
   const form = new FormData();
   form.append('game_id', '<?= $game_id ?>');
