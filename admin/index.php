@@ -1,12 +1,12 @@
 <?php
-// admin/index.php — Router utama admin dashboard
+// admin/index.php
 session_start();
 require_once __DIR__ . '/../config/db.php';
 require_once __DIR__ . '/../config/helpers.php';
 requireAdmin();
 
 $page = preg_replace('/[^a-z_]/', '', $_GET['page'] ?? 'dashboard');
-$allowed = ['dashboard','games','packages','payments','vouchers','transactions','users'];
+$allowed = ['dashboard','games','packages','payments','vouchers','transactions','users','leaderboard'];
 if (!in_array($page, $allowed)) $page = 'dashboard';
 
 $page_file = __DIR__ . "/pages/{$page}.php";
@@ -20,6 +20,7 @@ $page_titles = [
   'vouchers'     => 'Voucher',
   'transactions' => 'Transaksi',
   'users'        => 'Kelola Users',
+  'leaderboard'  => 'Leaderboard',
 ];
 $pageTitle = $page_titles[$page] ?? 'Admin';
 ?>
@@ -49,6 +50,33 @@ $pageTitle = $page_titles[$page] ?? 'Admin';
     <?php include __DIR__ . "/pages/{$page}.php"; ?>
   </div>
 </div>
+
+<!-- Auto cek user baru setiap 30 detik -->
+<script>
+setInterval(function() {
+    fetch('/vannmarket/public/api/check_new_users.php')
+        .then(r => r.json())
+        .then(data => {
+            const badge = document.querySelector('a[href*="page=users"] .notif-badge');
+            if (data.count > 0) {
+                if (badge) {
+                    badge.textContent = data.count;
+                } else {
+                    const userLink = document.querySelector('a[href*="page=users"]');
+                    if (userLink) {
+                        const b = document.createElement('span');
+                        b.className = 'notif-badge';
+                        b.textContent = data.count;
+                        userLink.appendChild(b);
+                    }
+                }
+            } else {
+                if (badge) badge.remove();
+            }
+        })
+        .catch(() => {});
+}, 5000);
+</script>
 
 </body>
 </html>

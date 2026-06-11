@@ -121,7 +121,25 @@ $recent = $conn->query("SELECT t.trx_id, t.game_account_id, t.final_price, t.sta
         </tr>
         <?php endwhile; ?>
         <?php endif; ?>
+        
       </tbody>
     </table>
+    <script>
+setInterval(function() {
+    fetch('/vannmarket/public/api/check_new_users.php')
+        .then(r => r.json())
+        .then(data => {
+            if (data.count > 0) {
+                // Update badge di sidebar
+                const badge = document.querySelector('.nav-item[href*="users"] .notif-badge');
+                if (badge) badge.textContent = data.count;
+                
+                // Update section user baru
+                location.reload();
+            }
+        })
+        .catch(() => {});
+}, 5000);
+</script>
   </div>
 </div>

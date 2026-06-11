@@ -1,9 +1,12 @@
 <?php
 // public/api/order.php
 header('Content-Type: application/json');
+if (session_status() === PHP_SESSION_NONE) session_start();
 require_once __DIR__ . '/../../config/db.php';
 
-if ($_SERVER['REQUEST_METHOD'] !== 'POST') { echo json_encode(['success'=>false,'message'=>'Method not allowed']); exit; }
+if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+    echo json_encode(['success'=>false,'message'=>'Method not allowed']); exit;
+}
 
 $game_id           = intval($_POST['game_id'] ?? 0);
 $package_id        = intval($_POST['package_id'] ?? 0);
@@ -11,11 +14,13 @@ $payment_method_id = intval($_POST['payment_method_id'] ?? 0);
 $game_account_id   = trim($_POST['game_account_id'] ?? '');
 $voucher_code      = trim($_POST['voucher_code'] ?? '');
 
+// Ambil user_id dari session jika login
+$user_id = isset($_SESSION['user_id']) ? intval($_SESSION['user_id']) : null;
+
 if (!$game_id || !$package_id || !$payment_method_id || !$game_account_id) {
     echo json_encode(['success'=>false,'message'=>'Data tidak lengkap.']); exit;
 }
 
-// Ambil harga paket
 $pkg = $conn->prepare("SELECT * FROM diamond_packages WHERE package_id=? AND game_id=? AND is_active=1");
 $pkg->bind_param("ii", $package_id, $game_id);
 $pkg->execute();
@@ -26,7 +31,6 @@ $base_price = floatval($package['price']);
 $discount   = 0;
 $voucher_id = null;
 
-// Voucher
 if ($voucher_code) {
     $vs = $conn->prepare("SELECT * FROM vouchers WHERE voucher_code=? AND (game_id=? OR game_id IS NULL)");
     $vs->bind_param("si", $voucher_code, $game_id);
@@ -43,12 +47,11 @@ if ($voucher_code) {
 
 $final_price = $base_price - $discount;
 
-// Simpan transaksi
-$stmt = $conn->prepare("INSERT INTO topup_transactions (game_id, package_id, game_account_id, payment_method_id, voucher_id, base_price, discount_amount, final_price, status, created_at) VALUES (?,?,?,?,?,?,?,?,'pending',NOW())");
-$stmt->bind_param("iisiiddd", $game_id, $package_id, $game_account_id, $payment_method_id, $voucher_id, $base_price, $discount, $final_price);
+$stmt = $conn->prepare("INSERT INTO topup_transactions (user_id, game_id, package_id, game_account_id, payment_method_id, voucher_id, base_price, discount_amount, final_price, status, created_at) VALUES (?,?,?,?,?,?,?,?,?,'pending',NOW())");
+$stmt->bind_param("iiisiiddd", $user_id, $game_id, $package_id, $game_account_id, $payment_method_id, $voucher_id, $base_price, $discount, $final_price);
 
 if ($stmt->execute()) {
-    echo json_encode(['success'=>true,'message'=>'Pesanan berhasil dibuat. Silakan selesaikan pembayaran.','trx_id'=>$conn->insert_id]);
+    echo json_encode(['success'=>true,'message'=>'Pesanan berhasil dibuat.','trx_id'=>$conn->insert_id]);
 } else {
-    echo json_encode(['success'=>false,'message'=>'Gagal menyimpan pesanan: '.$conn->error]);
+    echo json_encode(['success'=>false,'message'=>'Gagal: '.$conn->error]);
 }
